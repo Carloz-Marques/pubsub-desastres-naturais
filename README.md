@@ -1,3 +1,19 @@
+# Sistema Pub/Sub para Alertas de Desastres Naturais
+
+**Disciplina:** Sistemas Computacionais Distribuídos
+**Professora:** Ana Paula
+
+## Integrantes do grupo
+
+- Carlos Henrique Marques
+- Gabriela Pacheco Demola
+- Julia Pacheco Demola
+
+## Sobre o projeto
+
+Este projeto apresenta uma implementação simplificada do padrão arquitetural Publish/Subscribe (Pub/Sub), utilizando como cenário um sistema de alertas de desastres naturais em Goiânia.
+
+
 # Pub/Sub — Alertas de Desastres Naturais
 
 Projeto simples em TypeScript que demonstra Publish/Subscribe em um sistema de
@@ -43,9 +59,3 @@ Sensor (Publisher) → Broker → Tópico → Subscribers
 - Novo desastre, região ou subscriber: `src/DisasterSimulation.ts`.
 - Funcionamento do Pub/Sub: `src/PubSub.ts`.
 - Inicialização: `src/index.ts`.
-
-## Integrantes
-
-- Nome do aluno: Carlos Henrique Marques
-- Nome do aluno Gabriela Pacheco Demola
-- Nome do aluno Julia Pachecoo Demola
