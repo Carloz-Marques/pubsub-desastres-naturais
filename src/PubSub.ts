@@ -1,28 +1,101 @@
-/** Uma função subscriber recebe a mensagem publicada. */
-export interface Subscriber {
-  (mensagem: any): void;
+interface Subscriber {
+  (message: any): void;
 }
 
-/** Broker simplificado, seguindo a mesma ideia do vídeo. */
-export default class PubSub {
-  private topicos: { [nome: string]: Subscriber[] } = {};
+class PubSub {
+  private topics: {
+    [topic: string]: Subscriber[];
+  } = {};
 
-  subscribe(topico: string, subscriber: Subscriber): void {
-    if (!this.topicos[topico]) {
-      this.topicos[topico] = [];
+  /**
+   * Inscreve um Subscriber.
+   *
+   * Retorna true quando a inscrição é realizada.
+   * Retorna false quando já existe essa inscrição.
+   */
+  subscribe(
+    topic: string,
+    subscriber: Subscriber,
+  ): boolean {
+    if (!this.topics[topic]) {
+      this.topics[topic] = [];
     }
-    this.topicos[topico].push(subscriber);
+
+    const alreadySubscribed =
+      this.topics[topic].includes(subscriber);
+
+    if (alreadySubscribed) {
+      return false;
+    }
+
+    this.topics[topic].push(subscriber);
+
+    return true;
   }
 
-  unsubscribe(topico: string, subscriber: Subscriber): void {
-    if (!this.topicos[topico]) return;
-    this.topicos[topico] = this.topicos[topico].filter(
-      (inscrito) => inscrito !== subscriber,
+  /**
+   * Remove um Subscriber.
+   *
+   * Retorna true quando ele foi removido.
+   * Retorna false quando não estava inscrito.
+   */
+  unsubscribe(
+    topic: string,
+    subscriber: Subscriber,
+  ): boolean {
+    if (!this.topics[topic]) {
+      return false;
+    }
+
+    const subscriberExists =
+      this.topics[topic].includes(subscriber);
+
+    if (!subscriberExists) {
+      return false;
+    }
+
+    this.topics[topic] =
+      this.topics[topic].filter(
+        (currentSubscriber) =>
+          currentSubscriber !== subscriber,
+      );
+
+    return true;
+  }
+
+  /**
+   * Publica uma mensagem e retorna a quantidade
+   * de Subscribers notificados.
+   */
+  publish(
+    topic: string,
+    message: any,
+  ): number {
+    const subscribers =
+      this.topics[topic];
+
+    if (
+      !subscribers ||
+      subscribers.length === 0
+    ) {
+      return 0;
+    }
+
+    subscribers.forEach(
+      (subscriber) => subscriber(message),
     );
+
+    return subscribers.length;
   }
 
-  publish(topico: string, mensagem: any): void {
-    if (!this.topicos[topico]) return;
-    this.topicos[topico].forEach((subscriber) => subscriber(mensagem));
+  /**
+   * Retorna a quantidade de inscritos no tópico.
+   */
+  subscriberCount(
+    topic: string,
+  ): number {
+    return this.topics[topic]?.length ?? 0;
   }
 }
+
+export default PubSub;
