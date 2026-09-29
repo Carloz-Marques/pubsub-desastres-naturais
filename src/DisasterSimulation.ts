@@ -1,78 +1,105 @@
 import PubSub from "./PubSub";
 
+/**
+ * Formato das mensagens de desastre.
+ */
 interface EventoDesastre {
   tipo: string;
   regiao: string;
   nivel: "baixo" | "moderado" | "alto" | "critico";
-  mensagem: string;
+  detalhes: string;
   publisher: string;
 }
 
-type Notificacao = (
-  evento: EventoDesastre,
-) => void;
+/**
+ * Destinatário de uma mensagem.
+ */
+interface Destinatario {
+  id: number;
+  nome: string;
+  icone: string;
+  acao: string;
 
-class Assinante {
+  notificar(
+    evento: EventoDesastre,
+  ): void;
+}
+
+/**
+ * Subscribers do sistema.
+ */
+class Assinante implements Destinatario {
   constructor(
+    public id: number,
     public nome: string,
-    private icone: string,
-    private acao: string,
+    public icone: string,
+    public acao: string,
   ) {}
 
   notificar(
     _evento: EventoDesastre,
   ): void {
     console.log(
-      `│ ${this.icone} ${this.nome.padEnd(29)} ` +
-        `${cores.cinza}→ ${this.acao}${cores.reset}`,
+      `│ ${this.icone} ${this.nome}`,
+    );
+
+    console.log(
+      `│    Ação: ${this.acao}`,
     );
   }
 }
 
+/**
+ * Cores utilizadas no terminal.
+ */
 const cores = {
   reset: "\x1b[0m",
   negrito: "\x1b[1m",
   cinza: "\x1b[90m",
-  azul: "\x1b[36m",
   verde: "\x1b[32m",
   amarelo: "\x1b[33m",
   vermelho: "\x1b[31m",
+  azul: "\x1b[36m",
   roxo: "\x1b[35m",
 };
 
-const TOPICOS = {
-  alagamento:
-    "Alagamento_SetorCentral_Goiania",
+/**
+ * Tópicos do sistema.
+ */
+const TOPICO_ALAGAMENTO_CENTRO =
+  "Alagamento_SetorCentral_Goiania";
 
-  tempestade:
-    "Tempestade_RegiaoSul_Goiania",
-};
+const TOPICO_TEMPESTADE_SUL =
+  "Tempestade_RegiaoSul_Goiania";
 
-const broker = new PubSub();
+/**
+ * Instância do Broker.
+ */
+const pubSub = new PubSub();
 
+/**
+ * Controla a numeração dos alertas.
+ */
 let numeroAlerta = 0;
 
-function linha(
-  caractere = "═",
-): string {
-  return caractere.repeat(68);
-}
-
-function cabecalho(): void {
+/**
+ * Cabeçalho principal.
+ */
+function mostrarCabecalho(): void {
   console.log(
-    `\n${cores.azul}${cores.negrito}`,
+    `${cores.azul}${cores.negrito}`,
   );
 
   console.log(
-    "╔════════════════════════════════════════════════════════════════════╗",
+    "╔════════════════════════════════════════════════════════════╗",
   );
 
   console.log(
-    "║       SISTEMA PUB/SUB DE ALERTAS — GOIÂNIA                      ║",
+    "║   SISTEMA DE ALERTAS DE DESASTRES NATURAIS — GOIÂNIA     ║",
   );
 
   console.log(
-    "╚════════════════════════════════════════════════════════════════════╝",
+    "╚════════════════════════════════════════════════════════════╝",
   );
 
   console.log(
@@ -80,48 +107,53 @@ function cabecalho(): void {
   );
 }
 
-function secao(
+/**
+ * Título de cada parte da apresentação.
+ */
+function mostrarSecao(
   titulo: string,
 ): void {
   console.log(
-    `\n${cores.roxo}${cores.negrito}${linha()}`,
+    `\n${cores.roxo}${cores.negrito}${titulo}${cores.reset}`,
   );
 
   console.log(
-    ` ${titulo}`,
-  );
-
-  console.log(
-    `${linha()}${cores.reset}`,
+    `${cores.cinza}${"─".repeat(62)}${cores.reset}`,
   );
 }
 
-function corNivel(
+/**
+ * Retorna uma cor conforme a gravidade.
+ */
+function corDoNivel(
   nivel: EventoDesastre["nivel"],
 ): string {
-  const coresPorNivel = {
-    baixo: cores.verde,
-    moderado: cores.azul,
-    alto: cores.amarelo,
-    critico: cores.vermelho,
-  };
+  if (nivel === "critico") {
+    return cores.vermelho;
+  }
 
-  return coresPorNivel[nivel];
+  if (nivel === "alto") {
+    return cores.amarelo;
+  }
+
+  if (nivel === "moderado") {
+    return cores.azul;
+  }
+
+  return cores.verde;
 }
 
-function inscrever(
+/**
+ * Mostra o resultado de uma inscrição.
+ */
+function mostrarInscricao(
+  nome: string,
   topico: string,
-  assinante: Assinante,
-  notificacao: Notificacao,
+  realizada: boolean,
 ): void {
-  const sucesso = broker.subscribe(
-    topico,
-    notificacao,
-  );
-
-  if (sucesso) {
+  if (realizada) {
     console.log(
-      `${cores.verde}✓${cores.reset} ${assinante.nome}`,
+      `${cores.verde}✓${cores.reset} ${nome}`,
     );
 
     console.log(
@@ -132,100 +164,67 @@ function inscrever(
   }
 
   console.log(
-    `${cores.amarelo}⚠ ${assinante.nome} já está inscrito em ${topico}.${cores.reset}`,
+    `${cores.amarelo}↪ Inscrição ignorada:${cores.reset} ` +
+      `${nome} já está inscrito em ${topico}.`,
   );
 }
 
-function desinscrever(
-  topico: string,
-  assinante: Assinante,
-  notificacao: Notificacao,
-): void {
-  const sucesso = broker.unsubscribe(
-    topico,
-    notificacao,
-  );
-
-  const simbolo = sucesso
-    ? `${cores.verde}✓`
-    : `${cores.amarelo}⚠`;
-
-  const mensagem = sucesso
-    ? `${assinante.nome} foi removido de ${topico}.`
-    : `${assinante.nome} não estava inscrito em ${topico}.`;
-
-  console.log(
-    `${simbolo} ${mensagem}${cores.reset}`,
-  );
-}
-
-function campo(
-  nome: string,
-  valor: string,
-): void {
-  console.log(
-    `│ ${cores.cinza}${nome.padEnd(12)}${cores.reset}${valor}`,
-  );
-}
-
-function publicar(
+/**
+ * Publisher: publica um alerta no Broker.
+ */
+function reportarDesastre(
   topico: string,
   evento: EventoDesastre,
 ): void {
   numeroAlerta++;
 
-  const numero = String(
-    numeroAlerta,
-  ).padStart(2, "0");
+  const numeroFormatado =
+    String(numeroAlerta).padStart(
+      2,
+      "0",
+    );
 
-  const nivelColorido =
-    `${corNivel(evento.nivel)}` +
-    `${cores.negrito}` +
-    `${evento.nivel.toUpperCase()}` +
-    `${cores.reset}`;
+  const corNivel =
+    corDoNivel(evento.nivel);
 
   console.log(
-    `\n${cores.negrito}┌─ ALERTA ${numero} ${"─".repeat(55)}${cores.reset}`,
+    `\n${cores.negrito}┌─ ALERTA ${numeroFormatado} ${"─".repeat(47)}${cores.reset}`,
   );
 
-  campo(
-    "Publisher:",
-    evento.publisher,
+  console.log(
+    `│ ${cores.cinza}Publisher:${cores.reset}  ${evento.publisher}`,
   );
 
-  campo(
-    "Tópico:",
-    topico,
+  console.log(
+    `│ ${cores.cinza}Tópico:${cores.reset}     ${topico}`,
   );
 
-  campo(
-    "Tipo:",
-    evento.tipo,
+  console.log(
+    `│ ${cores.cinza}Tipo:${cores.reset}       ${evento.tipo}`,
   );
 
-  campo(
-    "Região:",
-    evento.regiao,
+  console.log(
+    `│ ${cores.cinza}Região:${cores.reset}     ${evento.regiao}`,
   );
 
-  campo(
-    "Gravidade:",
-    nivelColorido,
+  console.log(
+    `│ ${cores.cinza}Gravidade:${cores.reset}  ` +
+      `${corNivel}${cores.negrito}${evento.nivel.toUpperCase()}${cores.reset}`,
   );
 
-  campo(
-    "Mensagem:",
-    evento.mensagem,
+  console.log(
+    `│ ${cores.cinza}Mensagem:${cores.reset}   ${evento.detalhes}`,
   );
 
   console.log(
     `├─ ${cores.negrito}SUBSCRIBERS NOTIFICADOS${cores.reset}`,
   );
 
-  const quantidade = broker.publish(
-    topico,
-    evento,
-  );
+  const quantidade =
+    pubSub.publish(
+      topico,
+      evento,
+    );
 
   if (quantidade === 0) {
     console.log(
@@ -238,247 +237,279 @@ function publicar(
   );
 
   console.log(
-    `${cores.negrito}└${"─".repeat(67)}${cores.reset}`,
+    `${cores.negrito}└${"─".repeat(61)}${cores.reset}`,
   );
 }
 
+/**
+ * Função executada pelo index.ts.
+ */
 export function executarSimulacao(): void {
-  cabecalho();
+  mostrarCabecalho();
 
+  /**
+   * Criação dos Subscribers.
+   */
   const aplicativo = new Assinante(
+    1,
     "Aplicativo dos cidadãos",
     "📱",
-    "Exibir notificação aos moradores.",
+    "Exibir uma notificação para os moradores.",
   );
 
   const sirene = new Assinante(
+    2,
     "Sirene pública",
     "🚨",
-    "Emitir alerta sonoro.",
+    "Emitir um alerta sonoro para a população.",
   );
 
   const bombeiros = new Assinante(
+    3,
     "Corpo de Bombeiros",
     "🚒",
-    "Preparar uma equipe.",
+    "Preparar uma equipe para atendimento.",
   );
 
   const defesaCivil = new Assinante(
+    4,
     "Defesa Civil de Goiânia",
     "🛡️",
-    "Coordenar a ocorrência.",
+    "Monitorar e coordenar a ocorrência.",
   );
 
-  const notificacoes = {
-    aplicativo:
-      aplicativo.notificar.bind(
-        aplicativo,
-      ),
+  /**
+   * As mesmas funções precisam ser utilizadas
+   * no subscribe e no unsubscribe.
+   */
+  const notificarAplicativo =
+    aplicativo.notificar.bind(
+      aplicativo,
+    );
 
-    sirene:
-      sirene.notificar.bind(
-        sirene,
-      ),
+  const notificarSirene =
+    sirene.notificar.bind(
+      sirene,
+    );
 
-    bombeiros:
-      bombeiros.notificar.bind(
-        bombeiros,
-      ),
+  const notificarBombeiros =
+    bombeiros.notificar.bind(
+      bombeiros,
+    );
 
-    defesaCivil:
-      defesaCivil.notificar.bind(
-        defesaCivil,
-      ),
-  };
+  const notificarDefesaCivil =
+    defesaCivil.notificar.bind(
+      defesaCivil,
+    );
 
-  secao(
+  /**
+   * Configuração das inscrições.
+   */
+  mostrarSecao(
     "CONFIGURAÇÃO DOS TÓPICOS",
   );
 
-  const inscricoes: Array<
-    [
-      string,
-      Assinante,
-      Notificacao,
-    ]
-  > = [
-    [
-      TOPICOS.alagamento,
-      aplicativo,
-      notificacoes.aplicativo,
-    ],
-    [
-      TOPICOS.alagamento,
-      sirene,
-      notificacoes.sirene,
-    ],
-    [
-      TOPICOS.alagamento,
-      bombeiros,
-      notificacoes.bombeiros,
-    ],
-    [
-      TOPICOS.alagamento,
-      defesaCivil,
-      notificacoes.defesaCivil,
-    ],
-    [
-      TOPICOS.tempestade,
-      aplicativo,
-      notificacoes.aplicativo,
-    ],
-    [
-      TOPICOS.tempestade,
-      bombeiros,
-      notificacoes.bombeiros,
-    ],
-    [
-      TOPICOS.tempestade,
-      defesaCivil,
-      notificacoes.defesaCivil,
-    ],
-  ];
-
-  inscricoes.forEach(
-    ([
-      topico,
-      assinante,
-      notificacao,
-    ]) => {
-      inscrever(
-        topico,
-        assinante,
-        notificacao,
-      );
-    },
+  mostrarInscricao(
+    aplicativo.nome,
+    TOPICO_ALAGAMENTO_CENTRO,
+    pubSub.subscribe(
+      TOPICO_ALAGAMENTO_CENTRO,
+      notificarAplicativo,
+    ),
   );
 
-  secao(
+  mostrarInscricao(
+    sirene.nome,
+    TOPICO_ALAGAMENTO_CENTRO,
+    pubSub.subscribe(
+      TOPICO_ALAGAMENTO_CENTRO,
+      notificarSirene,
+    ),
+  );
+
+  mostrarInscricao(
+    bombeiros.nome,
+    TOPICO_ALAGAMENTO_CENTRO,
+    pubSub.subscribe(
+      TOPICO_ALAGAMENTO_CENTRO,
+      notificarBombeiros,
+    ),
+  );
+
+  mostrarInscricao(
+    defesaCivil.nome,
+    TOPICO_ALAGAMENTO_CENTRO,
+    pubSub.subscribe(
+      TOPICO_ALAGAMENTO_CENTRO,
+      notificarDefesaCivil,
+    ),
+  );
+
+  mostrarInscricao(
+    aplicativo.nome,
+    TOPICO_TEMPESTADE_SUL,
+    pubSub.subscribe(
+      TOPICO_TEMPESTADE_SUL,
+      notificarAplicativo,
+    ),
+  );
+
+  mostrarInscricao(
+    bombeiros.nome,
+    TOPICO_TEMPESTADE_SUL,
+    pubSub.subscribe(
+      TOPICO_TEMPESTADE_SUL,
+      notificarBombeiros,
+    ),
+  );
+
+  mostrarInscricao(
+    defesaCivil.nome,
+    TOPICO_TEMPESTADE_SUL,
+    pubSub.subscribe(
+      TOPICO_TEMPESTADE_SUL,
+      notificarDefesaCivil,
+    ),
+  );
+
+  /**
+   * Demonstra que uma inscrição duplicada
+   * será recusada pelo Broker.
+   */
+  mostrarSecao(
     "VERIFICAÇÃO DE INSCRIÇÃO DUPLICADA",
   );
 
-  inscrever(
-    TOPICOS.alagamento,
-    aplicativo,
-    notificacoes.aplicativo,
+  mostrarInscricao(
+    aplicativo.nome,
+    TOPICO_ALAGAMENTO_CENTRO,
+    pubSub.subscribe(
+      TOPICO_ALAGAMENTO_CENTRO,
+      notificarAplicativo,
+    ),
   );
 
-  secao(
+  /**
+   * Cenário 1.
+   */
+  mostrarSecao(
     "CENÁRIO 1 — ALAGAMENTO NO SETOR CENTRAL",
   );
 
-  publicar(
-    TOPICOS.alagamento,
+  reportarDesastre(
+    TOPICO_ALAGAMENTO_CENTRO,
     {
       tipo: "Alagamento",
       regiao:
         "Setor Central de Goiânia",
       nivel: "alto",
-      mensagem:
+      detalhes:
         "Chuva forte e elevação rápida do nível da água.",
       publisher:
         "Sensor do Córrego Botafogo",
     },
   );
 
-  secao(
+  /**
+   * Cenário 2.
+   */
+  mostrarSecao(
     "CENÁRIO 2 — SIRENE EM MANUTENÇÃO",
   );
 
-  desinscrever(
-    TOPICOS.alagamento,
-    sirene,
-    notificacoes.sirene,
-  );
+  const sireneRemovida =
+    pubSub.unsubscribe(
+      TOPICO_ALAGAMENTO_CENTRO,
+      notificarSirene,
+    );
+
+  if (sireneRemovida) {
+    console.log(
+      `${cores.verde}✓${cores.reset} ` +
+        "A sirene foi desinscrita corretamente.",
+    );
+  }
 
   console.log(
     `${cores.cinza}Um novo alerta será publicado sem notificar a sirene.${cores.reset}`,
   );
 
-  publicar(
-    TOPICOS.alagamento,
+  reportarDesastre(
+    TOPICO_ALAGAMENTO_CENTRO,
     {
       tipo: "Alagamento",
       regiao:
         "Setor Central de Goiânia",
       nivel: "critico",
-      mensagem:
+      detalhes:
         "Água avançando sobre as vias da região.",
       publisher:
         "Sensor do Córrego Botafogo",
     },
   );
 
-  secao(
+  /**
+   * Cenário 3.
+   */
+  mostrarSecao(
     "CENÁRIO 3 — TEMPESTADE NA REGIÃO SUL",
   );
 
-  publicar(
-    TOPICOS.tempestade,
+  reportarDesastre(
+    TOPICO_TEMPESTADE_SUL,
     {
       tipo: "Tempestade",
       regiao:
         "Região Sul de Goiânia",
       nivel: "moderado",
-      mensagem:
+      detalhes:
         "Previsão de raios e rajadas de vento.",
       publisher:
         "Estação Meteorológica da Região Sul",
     },
   );
 
-  secao(
+  /**
+   * Cenário 4: tópico vazio.
+   */
+  mostrarSecao(
     "CENÁRIO 4 — TÓPICO SEM INSCRITOS",
   );
 
-  const inscritosTempestade: Array<
-    [
-      Assinante,
-      Notificacao,
-    ]
-  > = [
-    [
-      aplicativo,
-      notificacoes.aplicativo,
-    ],
-    [
-      bombeiros,
-      notificacoes.bombeiros,
-    ],
-    [
-      defesaCivil,
-      notificacoes.defesaCivil,
-    ],
-  ];
-
-  inscritosTempestade.forEach(
-    ([
-      assinante,
-      notificacao,
-    ]) => {
-      desinscrever(
-        TOPICOS.tempestade,
-        assinante,
-        notificacao,
-      );
-    },
+  pubSub.unsubscribe(
+    TOPICO_TEMPESTADE_SUL,
+    notificarAplicativo,
   );
 
-  publicar(
-    TOPICOS.tempestade,
+  pubSub.unsubscribe(
+    TOPICO_TEMPESTADE_SUL,
+    notificarBombeiros,
+  );
+
+  pubSub.unsubscribe(
+    TOPICO_TEMPESTADE_SUL,
+    notificarDefesaCivil,
+  );
+
+  console.log(
+    `${cores.amarelo}⚠ Todos os Subscribers foram removidos do tópico.${cores.reset}`,
+  );
+
+  reportarDesastre(
+    TOPICO_TEMPESTADE_SUL,
     {
       tipo: "Tempestade",
       regiao:
         "Região Sul de Goiânia",
       nivel: "alto",
-      mensagem:
+      detalhes:
         "Novo alerta de tempestade emitido.",
       publisher:
         "Estação Meteorológica da Região Sul",
     },
   );
 
-  secao(
+  mostrarSecao(
     "SIMULAÇÃO FINALIZADA",
   );
 
